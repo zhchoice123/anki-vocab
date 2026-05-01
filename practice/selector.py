@@ -2,7 +2,6 @@ import logging
 from typing import Protocol
 
 from anki.local_store import LocalStore
-from anki.repository import AnkiRepository
 from exceptions import AnkiConnectionError
 from models import WordCard
 
@@ -11,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 class _RepoLike(Protocol):
     def find(self, word: str) -> WordCard | None: ...
+    def recent_words(self, limit: int = 10, exclude: set[str] | None = None) -> list[WordCard]: ...
 
 
 class WordSelector:
@@ -63,7 +63,7 @@ class WordSelector:
     def _fetch_from_anki(self, needed: int, exclude: set[str]) -> list[WordCard]:
         """Fetch recent words from Anki deck (best-effort)."""
         try:
-            return []
+            return self._repo.recent_words(limit=needed, exclude=exclude) if self._repo else []
         except AnkiConnectionError:
             logger.warning("Anki unreachable — using only SQLite words")
             return []

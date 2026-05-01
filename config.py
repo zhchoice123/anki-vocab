@@ -61,8 +61,9 @@ class Config:
         )
 
     @staticmethod
-    def validate() -> None:
-        missing = [k for k in _REQUIRED_KEYS if not os.getenv(k)]
+    def validate(required_keys: list[str] | tuple[str, ...] | None = None) -> None:
+        keys = required_keys or tuple(_REQUIRED_KEYS)
+        missing = [k for k in keys if not os.getenv(k)]
         if not missing:
             return
         lines = ["Missing required API keys:"]

@@ -1,8 +1,8 @@
 """Core unit tests — no Anki, no Claude API needed."""
+import argparse
 import io
 import os
 import sys
-import tempfile
 import wave
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -11,13 +11,16 @@ from unittest.mock import MagicMock
 
 import pytest
 
+import add_word
 from anki.cache import CachingAnkiRepository
 from anki.formatter import CardFormatter
 from anki.local_store import LocalStore
+from anki.repository import AnkiRepository
+from config import Config
 from exceptions import AnkiConnectionError, DuplicateCardError
-from tts.utils import pcm_to_padded_wav
-from models import SimilarWord, WordCard
+from models import ReadingMaterial, ReadingQuestion, SimilarWord, WordCard
 from services.word_service import WordService
+from tts.utils import pcm_to_padded_wav
 
 
 # ─────────────────────────────────────────────
@@ -229,7 +232,6 @@ class TestPCMUtils:
         return b"\1\0" * frame_count
 
     def test_pcm_to_padded_wav_preserves_audio_and_extends_duration(self):
-        from tts.utils import pcm_to_padded_wav
 
         sample_rate = 24_000
         original_frames = 1_000
@@ -443,3 +445,107 @@ class TestWordSelector:
         from practice.selector import WordSelector
         selector = WordSelector(store)
         assert selector.select(count=10) == []
+
+    def test_pulls_from_anki_when_sqlite_has_too_few_words(self, store, sample_card):
+        from practice.selector import WordSelector
+
+        anki_card = WordCard(**{**sample_card.__dict__, "word": "ephemeral"})
+        repo = MagicMock()
+        repo.recent_words.return_value = [anki_card]
+
+        selector = WordSelector(store, repo)
+        words = selector.select(count=1)
+
+        assert words == [anki_card]
+        repo.recent_words.assert_called_once_with(limit=1, exclude=set())
+
+    def test_anki_fallback_is_best_effort(self, store):
+        from practice.selector import WordSelector
+
+        repo = MagicMock()
+        repo.recent_words.side_effect = AnkiConnectionError()
+
+        selector = WordSelector(store, repo)
+        assert selector.select(count=1) == []
+
+
+class TestAnkiRepository:
+    def test_recent_words_returns_round_trippable_cards(self, sample_card):
+        config = Config(anki_deck="Deck")
+        repo = AnkiRepository(config)
+        fields = CardFormatter().to_fields(sample_card)
+        raw_fields = {k: {"value": v} for k, v in fields.items()}
+        raw_fields["英语单词"] = {"value": sample_card.word}
+
+        def fake_request(action, **params):
+            if action == "findNotes":
+                assert params == {"query": 'deck:"Deck"'}
+                return [1]
+            if action == "notesInfo":
+                assert params == {"notes": [1]}
+                return [{"fields": raw_fields}]
+            raise AssertionError(f"unexpected action: {action}")
+
+        repo._request = fake_request
+
+        assert repo.recent_words(limit=1) == [sample_card]
+
+
+class TestConfigValidation:
+    def test_validate_accepts_specific_required_keys(self, monkeypatch):
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        monkeypatch.setenv("OPENAI_API_KEY", "set")
+
+        Config.validate(("OPENAI_API_KEY",))
+
+    def test_validate_exits_for_missing_specific_key(self, monkeypatch):
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+
+        with pytest.raises(SystemExit):
+            Config.validate(("ANTHROPIC_API_KEY",))
+
+
+class TestCLIConfigTiming:
+    def test_build_service_does_not_require_api_keys_for_existing_cards(self, monkeypatch, tmp_path):
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        monkeypatch.setenv("LOCAL_DB", str(tmp_path / "pending.db"))
+
+        args = argparse.Namespace()
+        service, renderer, player, config = add_word._build_service(args)
+
+        assert service is not None
+        assert renderer is not None
+        assert player is not None
+        assert config.local_db == str(tmp_path / "pending.db")
+
+
+class TestPracticeServer:
+    def test_check_endpoint_scores_and_records_wrong_target_words(self, store):
+        from practice.server import create_app
+
+        material = ReadingMaterial(
+            title="Practice",
+            article_html="<p>Text</p>",
+            words=["tenacious"],
+            questions=[
+                ReadingQuestion(
+                    question="Question?",
+                    options=["A. One", "B. Two", "C. Three", "D. Four"],
+                    answer="B",
+                    explanation="Because B is correct.",
+                    target_word="tenacious",
+                    question_type="detail",
+                )
+            ],
+        )
+        app = create_app(material, store)
+
+        response = app.test_client().post("/api/check", json={"answers": {"0": "A"}})
+
+        assert response.status_code == 200
+        payload = response.get_json()
+        assert payload["score"] == 0
+        assert payload["total"] == 1
+        assert payload["results"][0]["correct"] is False
+        assert store.get_error_words(limit=1) == ["tenacious"]

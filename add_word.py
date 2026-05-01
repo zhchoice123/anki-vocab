@@ -14,9 +14,9 @@ from config import Config, setup_logging
 from display.renderer import CardRenderer
 from exceptions import LLMError
 from llm.claude import ClaudeProvider
+from services.word_service import WordService
 from tts.openai_tts import OpenAITTS
 from tts.player import AudioPlayer
-from services.word_service import WordService
 
 _KNOWN_COMMANDS = {"add", "practice"}
 
@@ -78,7 +78,6 @@ def _parse_args() -> argparse.Namespace:
 
 
 def _build_service(args: argparse.Namespace) -> tuple[WordService, CardRenderer, AudioPlayer, Config]:
-    Config.validate()
     config = Config.from_env()
     if hasattr(args, "deck") and args.deck:
         config.anki_deck = args.deck
@@ -122,6 +121,7 @@ def _cmd_add(args: argparse.Namespace) -> None:
             renderer.render(card, is_new=False)
         else:
             renderer.status("  Asking Claude...")
+            Config.validate(("ANTHROPIC_API_KEY", "OPENAI_API_KEY"))
             card = service.fetch_and_save(word)
             renderer.render(card, is_new=True)
 
@@ -138,8 +138,8 @@ def _cmd_add(args: argparse.Namespace) -> None:
 
 
 def _cmd_practice(args: argparse.Namespace) -> None:
-    from practice.selector import WordSelector
     from practice.generator import ReadingGenerator
+    from practice.selector import WordSelector
     from practice.server import create_app, run_server
 
     service, _renderer, _player, config = _build_service(args)
@@ -152,6 +152,7 @@ def _cmd_practice(args: argparse.Namespace) -> None:
         )
         sys.exit(1)
 
+    Config.validate(("ANTHROPIC_API_KEY",))
     logging.info("Using words: %s", ", ".join(w.word for w in words))
     generator = ReadingGenerator(service._llm)
     material = generator.generate(words)

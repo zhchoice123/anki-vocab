@@ -73,3 +73,9 @@ class CachingAnkiRepository:
 
     def store_media(self, filename: str, data_b64: str) -> None:
         self._inner.store_media(filename, data_b64)
+
+    def recent_words(self, limit: int = 10, exclude: set[str] | None = None) -> list[WordCard]:
+        cards = self._inner.recent_words(limit=limit, exclude=exclude)
+        for card in cards:
+            self._cache.put(card.word.lower(), card)
+        return cards

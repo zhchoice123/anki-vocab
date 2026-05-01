@@ -1,0 +1,11 @@
+#!/usr/bin/env sh
+set -eu
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+PYTHON="${PYTHON:-$ROOT/venv/bin/python}"
+
+if [ "$#" -eq 0 ]; then
+    exec "$PYTHON" -m pytest "$ROOT/tests"
+fi
+
+exec "$PYTHON" -m pytest "$@"

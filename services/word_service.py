@@ -6,9 +6,9 @@ from anki.local_store import LocalStore
 from anki.repository import AnkiRepository
 from exceptions import AnkiConnectionError, DuplicateCardError
 from llm.base import LLMProvider
+from models import WordCard
 from tts.base import TTSProvider
 from tts.player import AudioPlayer
-from models import WordCard
 
 logger = logging.getLogger(__name__)
 

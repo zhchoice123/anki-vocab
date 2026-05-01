@@ -141,8 +141,8 @@ tts = ElevenLabsTTS(voice_id="...")
 ## Development
 
 ```bash
-venv/bin/pytest tests/         # full suite
-venv/bin/pytest tests/test_core.py -v   # verbose
+./scripts/test                 # full suite
+./scripts/test tests/test_core.py -v   # verbose
 ```
 
 No API keys or Anki are needed for unit tests.
