@@ -3,7 +3,7 @@ import re
 
 from models import WordCard
 
-_FIELD_STYLE = "color:#333333;background:transparent;"
+_FIELD_STYLE = "color:#333333;-webkit-text-fill-color:#333333;background:transparent;"
 
 
 class CardFormatter:
