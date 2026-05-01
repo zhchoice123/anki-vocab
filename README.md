@@ -146,3 +146,7 @@ tts = ElevenLabsTTS(voice_id="...")
 ```
 
 No API keys or Anki are needed for unit tests.
+
+## License
+
+MIT License. See [LICENSE](LICENSE).
