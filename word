@@ -1,0 +1,4 @@
+#!/bin/zsh
+# Wrapper: activate venv and run add_word.py
+DIR="$(cd "$(dirname "$0")" && pwd)"
+exec "$DIR/venv/bin/python" "$DIR/add_word.py" "$@"
