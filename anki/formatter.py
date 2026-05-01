@@ -3,6 +3,8 @@ import re
 
 from models import WordCard
 
+_FIELD_STYLE = "color:#333333;background:transparent;"
+
 
 class CardFormatter:
     """Maps WordCard ↔ the 10-field 英语单词模板(vocab配色) model."""
@@ -13,12 +15,12 @@ class CardFormatter:
         return {
             "英语单词":      card.word,
             "英美音标":      "",
-            "中文释义":      card.chinese_definition,
+            "中文释义":      self._readable(card.chinese_definition),
             "英语例句":      self._numbered_lines(card.examples),
             "中文例句":      self._numbered_lines(card.chinese_examples),
             "vocabulary简明": self._vocab_brief(card),
             "vocabulary扩展": self._vocab_extended(card),
-            "柯林斯星级":    self._stars(card.collins_stars),
+            "柯林斯星级":    self._readable(self._stars(card.collins_stars)),
             "柯林斯解释":    self._collins_html(card),
             "英语发音":      card.audio_ref,
         }
@@ -40,8 +42,11 @@ class CardFormatter:
 
     # ──────────────────────────────────────────────── field builders
 
+    def _readable(self, content: str) -> str:
+        return f'<div style="{_FIELD_STYLE}">{content}</div>' if content else ""
+
     def _numbered_lines(self, items: list[str]) -> str:
-        return "".join(f"({i+1}) {item}<br>" for i, item in enumerate(items))
+        return self._readable("".join(f"({i+1}) {item}<br>" for i, item in enumerate(items)))
 
     def _stars(self, n: int) -> str:
         n = max(0, min(5, n))
@@ -49,7 +54,7 @@ class CardFormatter:
 
     def _vocab_brief(self, card: WordCard) -> str:
         word = f"<b><u>{card.word}</u></b>"
-        return (
+        return self._readable(
             f"{word} means: {card.simple_meaning} "
             f"{card.key_idea}"
         )
@@ -61,7 +66,7 @@ class CardFormatter:
             f"<li><b>{sw.word}</b>: {sw.difference}</li>"
             for sw in card.similar_words
         )
-        return (
+        return self._readable(
             f'<span id="raw" style="display:none">{raw_json}</span>'
             f"<b>When to use:</b> {card.when_to_use}<br><br>"
             f"<b>When NOT to use:</b> {card.when_not_to_use}<br><br>"
@@ -77,8 +82,8 @@ class CardFormatter:
         ex_en = card.collins_example_en.replace(
             card.word, word_highlighted, 1
         ) if card.collins_example_en else ""
-        return (
-            '<div class="tab_content" id="dict_tab_101" style="display:block">'
+        return self._readable(
+            '<div class="tab_content" id="dict_tab_101" style="display:block;color:#333333;">'
             '<div class="part_main"><div class="collins_content">'
             '<div class="explanation_item"><div class="explanation_box">'
             '<span class="item_number">1</span>'

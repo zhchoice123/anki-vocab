@@ -73,6 +73,17 @@ class TestCardFormatter:
         fields = CardFormatter().to_fields(sample_card)
         assert fields["英语单词"] == "tenacious"
 
+    def test_generated_fields_force_readable_text_color(self, sample_card):
+        fields = CardFormatter().to_fields(sample_card)
+        styled_fields = [
+            "英语例句",
+            "vocabulary简明",
+            "vocabulary扩展",
+            "柯林斯星级",
+        ]
+        for name in styled_fields:
+            assert "color:#333333" in fields[name]
+
     def test_round_trip_preserves_all_fields(self, sample_card):
         fmt = CardFormatter()
         # Simulate what Anki returns: each field value wrapped in {"value": ...}
